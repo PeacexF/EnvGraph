@@ -1,6 +1,28 @@
+<div align="center">
+
+<picture>
+  <img src=".github/img/envgraph.png" width="320" alt="EnvGraph Logo">
+</picture>
+
 # EnvGraph
 
-> Visualize how configuration flows through your application.
+**Visualize how configuration flows through your application.**
+
+[![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+
+[![Graph Visualization](https://img.shields.io/badge/Graph-Visualization-4B5563)](#)
+[![CLI Tool](https://img.shields.io/badge/CLI-Developer%20Tool-4B5563)](#)
+
+![License](https://img.shields.io/badge/License-MIT-black)
+![Stage](https://img.shields.io/badge/Stage-Development-black)
+![Platform](https://img.shields.io/badge/Platform-Cross--Platform-black)
+
+
+</div>
+
+---
 
 EnvGraph is a developer tool that analyzes project configuration and generates an interactive graph showing where environment variables come from and where they are used.
 
