@@ -13,6 +13,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# git bash for windows
+defaults:
+  run:
+    shell: bash
+
 env:
   GO_VERSION: "1.26.2"
 
