@@ -14,6 +14,20 @@ All contributions are welcome: bug fixes, new features, documentation improvemen
 
 If you're planning a large feature, consider opening an issue first so we can discuss it.
 
+## Running the checks
+
+CI runs the same things you can run locally:
+
+```bash
+gofmt -l ./cmd ./internal ./tests   # must print nothing
+go vet ./...
+go test -race ./...
+```
+
+Tests are black-box: they live in `package foo_test` and exercise only the
+exported API. If something is hard to test that way, that usually points at
+the API rather than the test.
+
 ## Coding Style
 
 * Keep it simple.

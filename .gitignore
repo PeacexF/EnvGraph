@@ -27,6 +27,9 @@ go.work.sum
 # env file
 .env
 
+# The examples are fixtures
+!examples/**/.env
+
 # Editor/IDE
 # .idea/
 # .vscode/
@@ -68,3 +71,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Build output
+/envgraph
+graph.json

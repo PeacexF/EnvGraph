@@ -8,6 +8,8 @@
 
 **Visualize how configuration flows through your application.**
 
+[![CI](https://github.com/PeacexF/EnvGraph/actions/workflows/ci.yml/badge.svg)](https://github.com/PeacexF/EnvGraph/actions/workflows/ci.yml)
+
 [![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
@@ -144,14 +146,15 @@ none
 
 # Supported Sources
 
-Currently supported:
-
-| Source                    | Status  |
-| ------------------------- | ------- |
-| `.env` files              | Planned |
-| Docker Compose            | Planned |
-| Go environment access     | Planned |
-| Python environment access | Planned |
+| Source                    | Status      | Detects                                        |
+| ------------------------- | ----------- | ---------------------------------------------- |
+| `.env` files              | Supported   | assignments, quoting, multi-line values         |
+| Docker Compose            | Supported   | `environment`, `env_file`, `${VAR}` substitution |
+| Go environment access     | Supported   | `os.Getenv`, `os.LookupEnv`                     |
+| Python environment access | Supported   | `os.getenv`, `os.environ[...]`, `environ.get`   |
+| Dockerfile                | Planned     |                                                |
+| GitHub Actions            | Planned     |                                                |
+| Kubernetes manifests      | Planned     |                                                |
 
 More sources will be added gradually.
 
@@ -159,25 +162,85 @@ More sources will be added gradually.
 
 # Installation
 
-> Installation instructions will be added once the first release is available.
+```bash
+go install github.com/PeacexF/EnvGraph/cmd/envgraph@latest
+```
+
+Or build from a checkout:
+
+```bash
+go build -o envgraph ./cmd/envgraph
+```
 
 ---
 
 # Usage
 
-Example:
+Analyze a project and print its configuration flow:
 
 ```bash
 envgraph scan .
 ```
 
-Generate a configuration graph:
-
-```bash
-envgraph serve
+```
+DATABASE_URL  ok
+  source     .env:2
+  passed to  api (docker-compose.yml:5)
+  used in    config/database.go:7
 ```
 
-Open the visualization in your browser.
+Fail when configuration is missing, which makes it usable as a CI step:
+
+```bash
+envgraph check .
+```
+
+Exits with status `1` when a variable is used but never provided. Pass
+`--strict` to fail on unused variables too.
+
+Write the graph as JSON:
+
+```bash
+envgraph export .            # writes graph.json
+envgraph scan . -f json      # the analysis and the graph together
+```
+
+Useful flags:
+
+| Flag              | Effect                                            |
+| ----------------- | ------------------------------------------------- |
+| `--exclude <dir>` | skip additional directories                       |
+| `--include-tests` | count usage in test files                         |
+| `--show-values`   | print assigned values (these are often secrets)   |
+| `-o <file>`       | write to a file instead of stdout                 |
+
+Try it against the bundled examples:
+
+```bash
+envgraph scan examples/simple-go
+envgraph check examples/compose-python
+```
+
+---
+
+# How variables are resolved
+
+A variable is **missing** when nothing supplies a value for it. What counts
+as supplying a value is deliberately strict:
+
+| Written as                          | Counts as a source? |
+| ----------------------------------- | ------------------- |
+| `DATABASE_URL=postgres://...` in `.env` | yes             |
+| `LOG_LEVEL: info` in compose        | yes                 |
+| `PORT: ${PORT:-8080}` in compose    | yes, via the fallback |
+| `DATABASE_URL: ${DATABASE_URL}`     | no — it passes a value along without supplying one |
+| `- DATABASE_URL` in compose         | no — it forwards a host variable |
+
+`DB_HOST: ${POSTGRES_HOST}` renames a variable on the way into a container.
+`DB_HOST` is treated as supplied exactly when `POSTGRES_HOST` is.
+
+A variable is **unused** when it has a source but nothing reads it — neither
+application code nor a container it is passed to.
 
 ---
 
@@ -211,7 +274,8 @@ Builds relationships between configuration nodes.
 
 ### Web Viewer
 
-Displays the configuration flow interactively.
+Displays the configuration flow interactively. Not built yet — `envgraph
+export` already produces the `{nodes, edges}` JSON it will read.
 
 ---
 
