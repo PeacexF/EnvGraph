@@ -154,7 +154,7 @@ none
 | Go                        | Supported   | `os.Getenv`, `os.LookupEnv`                      |
 | Python                    | Supported   | `os.getenv`, `os.environ[...]`, `environ.get`    |
 | JavaScript / TypeScript   | Supported   | `process.env`, `import.meta.env`, destructuring  |
-| GitHub Actions            | Planned     |                                                  |
+| GitHub Actions            | Supported   | `env:` at every level, `${{ }}` expressions, `run:` scripts |
 | Kubernetes manifests      | Planned     |                                                  |
 
 More sources will be added gradually.
@@ -234,6 +234,26 @@ Useful flags:
 
 ---
 
+# GitHub Actions
+
+Workflows are read the way containers are: each job becomes a node, and
+variables flow into it.
+
+```
+DEPLOY_TOKEN  missing
+  source     (none)
+  passed to  deploy (.github/workflows/deploy.yml:35)
+  used in    .github/workflows/deploy.yml:35
+```
+
+That is the case worth catching — a `run:` script reads `$DEPLOY_TOKEN`, no
+`env:` block or secret supplies it, and the failure only shows up when the
+job runs. Variables the runner provides itself (`GITHUB_*`, `RUNNER_*`,
+`ACTIONS_*`) are ignored by default, as are shell locals: a name a script
+assigns to itself, loops over, or reads is not configuration.
+
+---
+
 # Configuration
 
 Drop an `.envgraph.yml` in the project root to stop reporting things you do
@@ -300,6 +320,9 @@ as supplying a value is deliberately strict:
 | `ENV PORT=3000` in a Dockerfile     | yes                 |
 | `ARG VERSION=1` in a Dockerfile     | yes, via the default |
 | `ARG VERSION` in a Dockerfile       | no — it needs `--build-arg` at build time |
+| `KEY: ${{ secrets.KEY }}` in a workflow | yes — GitHub supplies it |
+| `KEY: ${{ vars.KEY }}` / `${{ inputs.x }}` | yes, same reasoning |
+| `$KEY` in a workflow `run:` script  | no — reading is not providing |
 | `DATABASE_URL: ${DATABASE_URL}`     | no — it passes a value along without supplying one |
 | `- DATABASE_URL` in compose         | no — it forwards a host variable |
 

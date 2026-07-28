@@ -28,6 +28,9 @@ type Source struct {
 	// DerivedFrom names the variables this value was built from.
 	DerivedFrom []string `json:"derivedFrom,omitempty"`
 
+	// Origin names an external provider, such as a GitHub secret.
+	Origin string `json:"origin,omitempty"`
+
 	// Value is kept for comparison work; the CLI hides it unless asked,
 	// because .env files hold credentials.
 	Value string `json:"value,omitempty"`
@@ -73,7 +76,11 @@ func Analyze(res *scanner.Result) *Report {
 
 		switch occ.Kind {
 		case parser.KindDefinition:
-			v.Sources = append(v.Sources, Source{Location: occ.Location, Value: occ.Value})
+			v.Sources = append(v.Sources, Source{
+				Location: occ.Location,
+				Value:    occ.Value,
+				Origin:   occ.Origin,
+			})
 		case parser.KindReference:
 			switch {
 			case occ.HasDefault:

@@ -97,6 +97,32 @@ func TestRecognisedDockerfilesAndJavaScript(t *testing.T) {
 		"app.cjs", "app.js", "app.jsx", "app.mjs", "app.ts", "app.tsx")
 }
 
+func TestWorkflowsAreRecognisedByTheirDirectory(t *testing.T) {
+	root := project(t, map[string]string{
+		".github/workflows/ci.yml":      "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n",
+		".github/workflows/deploy.yaml": "on: push\njobs:\n  ship:\n    runs-on: ubuntu-latest\n",
+		".github/dependabot.yml":        "version: 2\n",
+		"ci.yml":                        "on: push\n",
+	})
+
+	assertPaths(t, scan(t, root, scanner.Options{}),
+		".github/workflows/ci.yml", ".github/workflows/deploy.yaml")
+}
+
+func TestWorkflowWinsOverComposeNaming(t *testing.T) {
+	root := project(t, map[string]string{
+		".github/workflows/docker-compose.yml": "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n",
+	})
+
+	res := scan(t, root, scanner.Options{})
+	if len(res.Files) != 1 || res.Files[0].Type != scanner.TypeWorkflow {
+		t.Errorf("files = %+v, want it read as a workflow", res.Files)
+	}
+	if len(res.Services) != 1 || res.Services[0].Name != "build" {
+		t.Errorf("services = %+v, want the job", res.Services)
+	}
+}
+
 func TestDeclarationFilesAreSkipped(t *testing.T) {
 	// A .d.ts holds types, never a call site.
 	root := project(t, map[string]string{
@@ -138,21 +164,23 @@ func TestUnrecognisedFileNames(t *testing.T) {
 
 func TestFileTypes(t *testing.T) {
 	root := project(t, map[string]string{
-		".env":               "A=1\n",
-		"docker-compose.yml": "services:\n  api:\n    image: x\n",
-		"main.go":            goSource,
-		"app.py":             "import os\n",
-		"Dockerfile":         "ENV A=1\n",
-		"app.ts":             "process.env.B\n",
+		".env":                     "A=1\n",
+		"docker-compose.yml":       "services:\n  api:\n    image: x\n",
+		"main.go":                  goSource,
+		"app.py":                   "import os\n",
+		"Dockerfile":               "ENV A=1\n",
+		"app.ts":                   "process.env.B\n",
+		".github/workflows/ci.yml": "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n",
 	})
 
 	want := map[string]scanner.FileType{
-		".env":               scanner.TypeEnv,
-		"docker-compose.yml": scanner.TypeCompose,
-		"main.go":            scanner.TypeGo,
-		"app.py":             scanner.TypePython,
-		"Dockerfile":         scanner.TypeDockerfile,
-		"app.ts":             scanner.TypeJavaScript,
+		".env":                     scanner.TypeEnv,
+		"docker-compose.yml":       scanner.TypeCompose,
+		"main.go":                  scanner.TypeGo,
+		"app.py":                   scanner.TypePython,
+		"Dockerfile":               scanner.TypeDockerfile,
+		"app.ts":                   scanner.TypeJavaScript,
+		".github/workflows/ci.yml": scanner.TypeWorkflow,
 	}
 
 	for _, f := range scan(t, root, scanner.Options{}).Files {

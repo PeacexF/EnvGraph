@@ -37,6 +37,11 @@ var SystemVariables = []string{
 	"TMPDIR",
 	"TZ",
 	"USER",
+
+	// Set by the GitHub Actions runner rather than by the workflow.
+	"ACTIONS_*",
+	"GITHUB_*",
+	"RUNNER_*",
 }
 
 // Config is the parsed .envgraph.yml.
@@ -113,14 +118,17 @@ func (c *Config) IgnoresVariable(name string) bool {
 	}
 
 	if c.SystemVariables == nil || *c.SystemVariables {
-		for _, system := range SystemVariables {
-			if name == system {
-				return true
-			}
+		if matchAny(SystemVariables, name) {
+			return true
 		}
 	}
 
-	for _, pattern := range c.Ignore {
+	return matchAny(c.Ignore, name)
+}
+
+// matchAny reports whether name equals or globs against any pattern.
+func matchAny(patterns []string, name string) bool {
+	for _, pattern := range patterns {
 		// An exact match is the common case and needs no glob machinery;
 		// filepath.Match would also reject a name containing "[".
 		if name == pattern {

@@ -35,9 +35,12 @@ type Occurrence struct {
 
 	// DerivedFrom names the variables this value is built from, as in "DB_HOST: ${POSTGRES_HOST}". Supplied exactly when all of them are.
 	DerivedFrom []string `json:"derivedFrom,omitempty"`
+
+	// Origin names an external provider of the value, such as a GitHub secret. The repository cannot show the value, but it does know something supplies it.
+	Origin string `json:"origin,omitempty"`
 }
 
-// Service is a container declared by an infrastructure file.
+// Service is a container or job — a named runtime context an infrastructure file declares.
 type Service struct {
 	Name     string   `json:"name"`
 	Location Location `json:"location"`

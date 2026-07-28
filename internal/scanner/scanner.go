@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/PeacexF/EnvGraph/internal/parser/golang"
 	"github.com/PeacexF/EnvGraph/internal/parser/javascript"
 	"github.com/PeacexF/EnvGraph/internal/parser/python"
+	"github.com/PeacexF/EnvGraph/internal/parser/workflow"
 )
 
 // FileType is the role a scanned file plays.
@@ -27,6 +29,7 @@ const (
 	TypeGo         FileType = "go"
 	TypePython     FileType = "python"
 	TypeJavaScript FileType = "javascript"
+	TypeWorkflow   FileType = "workflow"
 )
 
 // maxFileSize skips anything too large to be hand-written configuration.
@@ -117,7 +120,7 @@ func Scan(root string, opts Options) (*Result, error) {
 		}
 		rel = filepath.ToSlash(rel)
 
-		fileType, ok := classify(d.Name())
+		fileType, ok := classify(rel)
 		if !ok {
 			return nil
 		}
@@ -169,13 +172,21 @@ func parse(t FileType, rel string, content []byte) (parser.Result, error) {
 		return python.Parse(rel, content)
 	case TypeJavaScript:
 		return javascript.Parse(rel, content)
+	case TypeWorkflow:
+		return workflow.Parse(rel, content)
 	default:
 		return parser.Result{}, nil
 	}
 }
 
-func classify(name string) (FileType, bool) {
+// classify takes the slash-separated path relative to the scan root, because a workflow is identified by the directory it sits in, not by its name.
+func classify(rel string) (FileType, bool) {
+	name := path.Base(rel)
+
 	switch {
+	// Checked before compose, so a workflow named docker-compose.yml is still read as a workflow.
+	case isWorkflow(rel):
+		return TypeWorkflow, true
 	case isEnvFile(name):
 		return TypeEnv, true
 	case isComposeFile(name):
@@ -190,6 +201,16 @@ func classify(name string) (FileType, bool) {
 		return TypeJavaScript, true
 	}
 	return "", false
+}
+
+// isWorkflow matches any YAML file under .github/workflows.
+func isWorkflow(rel string) bool {
+	if !strings.HasSuffix(rel, ".yml") && !strings.HasSuffix(rel, ".yaml") {
+		return false
+	}
+	dir := path.Dir(rel)
+	return dir == ".github/workflows" ||
+		strings.HasSuffix(dir, "/.github/workflows")
 }
 
 // isDockerfile matches Dockerfile, Dockerfile.prod, and api.Dockerfile.

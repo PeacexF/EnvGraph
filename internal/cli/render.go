@@ -9,6 +9,7 @@ import (
 
 	"github.com/PeacexF/EnvGraph/internal/analyzer"
 	"github.com/PeacexF/EnvGraph/internal/parser"
+	"github.com/PeacexF/EnvGraph/internal/parser/workflow"
 	"github.com/PeacexF/EnvGraph/internal/scanner"
 )
 
@@ -75,6 +76,8 @@ func writeReport(w io.Writer, res *scanner.Result, report *analyzer.Report, show
 				label = "default"
 			case len(src.DerivedFrom) > 0:
 				label = "derived"
+			case src.Origin != "":
+				label = "external"
 			}
 
 			line := fmt.Sprintf("  %-10s %s", label, location(src.Location))
@@ -82,6 +85,8 @@ func writeReport(w io.Writer, res *scanner.Result, report *analyzer.Report, show
 			case len(src.DerivedFrom) > 0:
 				line += fmt.Sprintf("  %sfrom %s%s",
 					dim, strings.Join(src.DerivedFrom, ", "), reset)
+			case src.Origin != "":
+				line += fmt.Sprintf("  %s%s%s", dim, originLabel(src.Origin), reset)
 			case showValues && src.Value != "":
 				line += fmt.Sprintf("  %s= %s%s", dim, src.Value, reset)
 			}
@@ -107,6 +112,20 @@ func writeReport(w io.Writer, res *scanner.Result, report *analyzer.Report, show
 	}
 
 	writeSummary(w, report)
+}
+
+// originLabel names an external provider in words.
+func originLabel(origin string) string {
+	switch origin {
+	case workflow.OriginSecret:
+		return "GitHub secret"
+	case workflow.OriginVar:
+		return "GitHub repository variable"
+	case workflow.OriginInput:
+		return "workflow input"
+	default:
+		return origin
+	}
 }
 
 func writeSummary(w io.Writer, report *analyzer.Report) {
