@@ -39,7 +39,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	root.AddCommand(newScanCmd(), newCheckCmd(), newExportCmd())
+	root.AddCommand(newScanCmd(), newCheckCmd(), newExportCmd(), newServeCmd())
 
 	if err := root.Execute(); err != nil {
 		// A failed check has already listed its findings.

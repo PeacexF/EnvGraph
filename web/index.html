@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EnvGraph</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <strong>EnvGraph</strong>
+      <span id="root" class="muted"></span>
+    </div>
+
+    <div class="controls">
+      <input id="search" type="search" placeholder="Search variables and files" autocomplete="off">
+
+      <div class="filters" role="group" aria-label="Filter by status">
+        <button type="button" data-filter="all" class="active">All</button>
+        <button type="button" data-filter="missing">Missing <span id="count-missing">0</span></button>
+        <button type="button" data-filter="unused">Unused <span id="count-unused">0</span></button>
+      </div>
+
+      <button type="button" id="refresh" title="Re-scan the project">Refresh</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="graph"></div>
+
+    <aside id="details" hidden>
+      <button type="button" id="close-details" aria-label="Close">&times;</button>
+      <div id="details-body"></div>
+    </aside>
+
+    <div id="status" class="overlay">Loading…</div>
+  </main>
+
+  <footer>
+    <span class="legend"><i class="swatch ok"></i> ok</span>
+    <span class="legend"><i class="swatch missing"></i> missing</span>
+    <span class="legend"><i class="swatch unused"></i> unused</span>
+    <span class="legend"><i class="swatch file"></i> file</span>
+    <span class="legend"><i class="swatch service"></i> service</span>
+    <span class="spacer"></span>
+    <span id="summary" class="muted"></span>
+  </footer>
+
+  <script src="vendor/cytoscape.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

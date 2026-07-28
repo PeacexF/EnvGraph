@@ -3,6 +3,9 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -10,6 +13,7 @@ import (
 	"github.com/PeacexF/EnvGraph/internal/analyzer"
 	"github.com/PeacexF/EnvGraph/internal/cli"
 	"github.com/PeacexF/EnvGraph/internal/scanner"
+	"github.com/PeacexF/EnvGraph/internal/server"
 )
 
 func examplePath(name string) string {
@@ -222,4 +226,79 @@ func TestExportedGraphParsesForEveryExample(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestViewerServesTheExamples drives the real handler over HTTP, which is
+// the only place the embedded assets and the API meet.
+func TestViewerServesTheExamples(t *testing.T) {
+	for _, example := range []string{"simple-go", "compose-python"} {
+		t.Run(example, func(t *testing.T) {
+			ts := httptest.NewServer(server.New(server.Options{Root: examplePath(example)}))
+			defer ts.Close()
+
+			body := getBody(t, ts.URL+"/api/graph")
+
+			var doc struct {
+				Files     []struct{} `json:"files"`
+				Variables []struct {
+					Name    string `json:"name"`
+					Status  string `json:"status"`
+					Sources []struct {
+						Value string `json:"value"`
+					} `json:"sources"`
+				} `json:"variables"`
+				Graph struct {
+					Nodes []struct{} `json:"nodes"`
+					Edges []struct{} `json:"edges"`
+				} `json:"graph"`
+			}
+			if err := json.Unmarshal(body, &doc); err != nil {
+				t.Fatalf("api/graph is not valid JSON: %v", err)
+			}
+
+			if len(doc.Variables) == 0 || len(doc.Graph.Nodes) == 0 {
+				t.Fatalf("document is empty: %s", body)
+			}
+
+			for _, v := range doc.Variables {
+				for _, s := range v.Sources {
+					if s.Value != "" {
+						t.Errorf("%s leaked the value %q to the browser", v.Name, s.Value)
+					}
+				}
+			}
+
+			// The page and every asset it references must load.
+			page := string(getBody(t, ts.URL+"/"))
+			for _, asset := range []string{"/app.js", "/style.css", "/vendor/cytoscape.min.js"} {
+				if !strings.Contains(page, strings.TrimPrefix(asset, "/")) {
+					t.Errorf("the page does not reference %s", asset)
+				}
+				getBody(t, ts.URL+asset)
+			}
+		})
+	}
+}
+
+func getBody(t *testing.T, url string) []byte {
+	t.Helper()
+
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("GET %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET %s = %d, want 200", url, resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read %s: %v", url, err)
+	}
+	if len(body) == 0 {
+		t.Fatalf("GET %s returned an empty body", url)
+	}
+	return body
 }

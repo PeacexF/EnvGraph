@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/PeacexF/EnvGraph/internal/analyzer"
-	"github.com/PeacexF/EnvGraph/internal/scanner"
 )
 
 func newScanCmd() *cobra.Command {
@@ -44,7 +43,9 @@ func newScanCmd() *cobra.Command {
 				writeReport(w, res, report, showValues)
 				return nil
 			case "json":
-				return writeJSON(w, res, report)
+				enc := json.NewEncoder(w)
+				enc.SetIndent("", "  ")
+				return enc.Encode(analyzer.NewDocument(res, report, showValues))
 			default:
 				return fmt.Errorf("unknown format %q: use text or json", format)
 			}
@@ -58,28 +59,6 @@ func newScanCmd() *cobra.Command {
 		"print the value assigned to each variable (these are often secrets)")
 
 	return cmd
-}
-
-// scanDocument pairs the analysis with the graph, so one file answers both "what is wrong" and "how does it connect".
-type scanDocument struct {
-	Files     []scanner.File      `json:"files"`
-	Variables []analyzer.Variable `json:"variables"`
-	Graph     json.RawMessage     `json:"graph"`
-}
-
-func writeJSON(w io.Writer, res *scanner.Result, report *analyzer.Report) error {
-	g, err := json.Marshal(analyzer.Graph(res, report))
-	if err != nil {
-		return err
-	}
-
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(scanDocument{
-		Files:     res.Files,
-		Variables: report.Variables,
-		Graph:     g,
-	})
 }
 
 // openOutput returns the destination and a close function. An empty path, or "-", means the command's own stdout, which must not be closed.

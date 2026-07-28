@@ -3,6 +3,7 @@ package cli_test
 import (
 	"bytes"
 	"encoding/json"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -369,7 +370,9 @@ func TestTooManyArguments(t *testing.T) {
 }
 
 func TestUnknownCommand(t *testing.T) {
-	res := run("serve")
+	// Must be a name no command will ever take: a real one would run, and
+	// `serve` in particular would block the suite forever.
+	res := run("visualise")
 
 	if res.code != 1 {
 		t.Errorf("exit code = %d, want 1", res.code)
@@ -432,4 +435,42 @@ func TestCheckShowsWhereAMissingVariableIsPassed(t *testing.T) {
 		t.Errorf("exit code = %d, want 1", res.code)
 	}
 	assertContains(t, res.stdout, "SECRET is used but never provided", "passed to api")
+}
+
+func TestServeRejectsAMissingPath(t *testing.T) {
+	res := run("serve", filepath.Join(t.TempDir(), "nowhere"))
+
+	if res.code != 1 {
+		t.Errorf("exit code = %d, want 1", res.code)
+	}
+	assertContains(t, res.stderr, "error:")
+}
+
+func TestServeReportsAPortItCannotBind(t *testing.T) {
+	// Occupy a port, then ask serve for the same one.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	_, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res := run("serve", sample(t), "--port", port)
+	if res.code != 1 {
+		t.Errorf("exit code = %d, want 1", res.code)
+	}
+	assertContains(t, res.stderr, "listen on")
+}
+
+func TestServeHelpDocumentsItsDefaults(t *testing.T) {
+	res := run("serve", "--help")
+
+	if res.code != 0 {
+		t.Fatalf("exit code = %d, want 0", res.code)
+	}
+	assertContains(t, res.stdout, "--port", "--host", "--show-values", "localhost")
 }

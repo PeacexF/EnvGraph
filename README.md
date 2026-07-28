@@ -198,6 +198,16 @@ envgraph check .
 Exits with status `1` when a variable is used but never provided. Pass
 `--strict` to fail on unused variables too.
 
+Explore it in a browser:
+
+```bash
+envgraph serve .
+```
+
+Opens an interactive graph on `http://127.0.0.1:8080`. Click a node to see
+where a variable comes from and where it goes; filter to missing or unused.
+The project is re-scanned on every request, so a reload picks up your edits.
+
 Write the graph as JSON:
 
 ```bash
@@ -211,7 +221,7 @@ Useful flags:
 | ----------------- | ------------------------------------------------- |
 | `--exclude <dir>` | skip additional directories                       |
 | `--include-tests` | count usage in test files                         |
-| `--show-values`   | print assigned values (these are often secrets)   |
+| `--show-values`   | include assigned values (these are often secrets) |
 | `-o <file>`       | write to a file instead of stdout                 |
 
 Try it against the bundled examples:
@@ -274,8 +284,9 @@ Builds relationships between configuration nodes.
 
 ### Web Viewer
 
-Displays the configuration flow interactively. Not built yet — `envgraph
-export` already produces the `{nodes, edges}` JSON it will read.
+Displays the configuration flow interactively. Built from plain ES modules
+with a vendored Cytoscape.js, compiled into the binary with `go:embed`, so
+`go build` remains the only build step and there is nothing to install.
 
 ---
 
