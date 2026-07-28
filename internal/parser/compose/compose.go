@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/PeacexF/EnvGraph/internal/parser"
+	"github.com/PeacexF/EnvGraph/internal/parser/interpolate"
 )
 
 // Parse reads a compose file. filePath must be relative to the scan root, so that env_file entries resolve to the same paths the scanner reports.
@@ -100,7 +101,7 @@ func entry(key, value string, assigned bool, filePath string, line int, service 
 		}}
 	}
 
-	refs := findReferences(value)
+	refs := interpolate.Find(value)
 	if len(refs) == 0 {
 		return []parser.Occurrence{{
 			Name:     key,
@@ -113,23 +114,21 @@ func entry(key, value string, assigned bool, filePath string, line int, service 
 
 	var out []parser.Occurrence
 	keyCovered := false
-	unresolved := make([]string, 0, len(refs))
 
 	for _, ref := range refs {
 		out = append(out, parser.Occurrence{
-			Name:       ref.name,
+			Name:       ref.Name,
 			Kind:       parser.KindReference,
 			Location:   loc,
 			Service:    service,
-			HasDefault: ref.hasDefault,
+			HasDefault: ref.HasDefault,
 		})
-		if ref.name == key {
+		if ref.Name == key {
 			keyCovered = true
 		}
-		if !ref.hasDefault {
-			unresolved = append(unresolved, ref.name)
-		}
 	}
+
+	unresolved := interpolate.Unresolved(refs)
 
 	// "DB_HOST: ${POSTGRES_HOST}" renames a variable on the way in. The service does receive DB_HOST, but only if POSTGRES_HOST resolves.
 	if !keyCovered {

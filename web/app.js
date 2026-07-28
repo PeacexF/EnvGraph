@@ -1,67 +1,170 @@
+import { Force } from "./force.js";
+
 const el = (id) => document.getElementById(id);
 
 const statusEl = el("status");
 const detailsEl = el("details");
 const detailsBody = el("details-body");
 
-// variables is indexed by name so the details panel can show a variable's
-// full story, which the graph edges alone do not carry.
+// variables is indexed by name so the details panel can show a variable's full story, which the graph edges alone do not carry.
 let variables = new Map();
 let cy = null;
+let force = null;
 let filter = "all";
 
-const STYLE = [
-  {
-    selector: "node",
-    style: {
-      label: "data(label)",
-      "font-size": 11,
-      color: "#8a929c",
-      "text-valign": "bottom",
-      "text-margin-y": 4,
-      "text-wrap": "ellipsis",
-      "text-max-width": 140,
-      width: 16,
-      height: 16,
-      "background-color": "#64748b",
-    },
-  },
-  { selector: 'node[type="variable"]', style: { shape: "round-rectangle", width: 20, height: 20, "font-weight": 600 } },
-  { selector: 'node[type="service"]', style: { shape: "hexagon", width: 24, height: 24, "background-color": "#7c3aed" } },
-  { selector: 'node[type="file"]', style: { shape: "ellipse", "background-color": "#64748b" } },
-  { selector: 'node[status="ok"]', style: { "background-color": "#16a34a" } },
-  { selector: 'node[status="missing"]', style: { "background-color": "#dc2626", width: 24, height: 24 } },
-  { selector: 'node[status="unused"]', style: { "background-color": "#d97706" } },
-  {
-    selector: "edge",
-    style: {
-      width: 1.2,
-      "line-color": "#b6bec8",
-      "target-arrow-color": "#b6bec8",
-      "target-arrow-shape": "triangle",
-      "arrow-scale": 0.8,
-      "curve-style": "bezier",
-      opacity: 0.75,
-    },
-  },
-  { selector: 'edge[relationship="consumed_by"]', style: { "line-style": "dashed" } },
-  { selector: ".dimmed", style: { opacity: 0.08, "text-opacity": 0 } },
-  {
-    selector: ".highlighted",
-    style: { "border-width": 3, "border-color": "#2563eb", "text-opacity": 1, opacity: 1 },
-  },
-];
+// Status is never carried by hue alone: ok-green and missing-red are nearly identical under deuteranopia, so each status also gets a glyph and a border.
+const GLYPH = { missing: "!", unused: "?", ok: "" };
 
-// label shortens a file path to its basename; full paths crowd the canvas.
+function css(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function style() {
+  return [
+    {
+      selector: "node",
+      style: {
+        label: "data(label)",
+        "font-family": "system-ui, -apple-system, sans-serif",
+        "font-size": 11,
+        color: css("--ink-2"),
+        "text-valign": "center",
+        "text-halign": "center",
+        "text-wrap": "ellipsis",
+        "text-max-width": 150,
+        "border-width": 1,
+        "border-color": css("--ring"),
+        "transition-property": "opacity, border-width, border-color",
+        "transition-duration": "140ms",
+      },
+    },
+
+    // Variables are the subject of the graph, so they carry their name inside
+    // a pill; files and services are context and stay small.
+    {
+      selector: 'node[type="variable"]',
+      style: {
+        shape: "round-rectangle",
+        width: "label",
+        height: 24,
+        padding: "8px",
+        "background-color": css("--surface"),
+        "border-width": 2,
+        "font-weight": 600,
+        color: css("--ink"),
+      },
+    },
+    {
+      selector: 'node[status="ok"]',
+      style: { "border-color": css("--ok"), "background-color": mix(css("--ok")) },
+    },
+    {
+      selector: 'node[status="missing"]',
+      style: {
+        "border-color": css("--missing"),
+        "background-color": mix(css("--missing")),
+        "border-style": "double",
+        "border-width": 4,
+      },
+    },
+    {
+      selector: 'node[status="unused"]',
+      style: {
+        "border-color": css("--unused"),
+        "background-color": mix(css("--unused")),
+        "border-style": "dashed",
+      },
+    },
+
+    {
+      selector: 'node[type="file"]',
+      style: {
+        shape: "ellipse",
+        width: 13,
+        height: 13,
+        "background-color": css("--file"),
+        "text-valign": "bottom",
+        "text-margin-y": 5,
+        "font-size": 10,
+        color: css("--muted"),
+      },
+    },
+    {
+      selector: 'node[type="service"]',
+      style: {
+        shape: "hexagon",
+        width: 26,
+        height: 26,
+        "background-color": css("--service"),
+        "text-valign": "bottom",
+        "text-margin-y": 5,
+        "font-size": 10,
+        "font-weight": 600,
+        color: css("--service"),
+      },
+    },
+
+    {
+      selector: "edge",
+      style: {
+        width: 1.2,
+        "line-color": css("--edge"),
+        "target-arrow-color": css("--edge"),
+        "target-arrow-shape": "triangle",
+        "arrow-scale": 0.7,
+        "curve-style": "bezier",
+        opacity: 0.8,
+      },
+    },
+    { selector: 'edge[relationship="consumed_by"]', style: { "line-style": "dashed" } },
+    {
+      selector: 'edge[relationship="passed_to"]',
+      style: { "line-color": css("--service"), "target-arrow-color": css("--service"), opacity: 0.55 },
+    },
+
+    { selector: ".dimmed", style: { opacity: 0.07, "text-opacity": 0.07 } },
+    {
+      selector: "node.selected",
+      style: { "border-color": css("--accent"), "border-width": 3, "border-style": "solid" },
+    },
+    {
+      selector: "edge.selected",
+      style: { "line-color": css("--accent"), "target-arrow-color": css("--accent"), opacity: 1, width: 2 },
+    },
+    { selector: "node.hit", style: { "border-color": css("--accent"), "border-width": 3 } },
+  ];
+}
+
+// mix fades a status colour toward the surface for a fill that stays behind
+// the label rather than competing with it.
+function mix(color) {
+  return `color-mix(in srgb, ${color} 14%, ${css("--surface")})`;
+}
+
 function label(node) {
-  if (node.type !== "file") return node.name;
-  const parts = node.name.split("/");
-  return parts[parts.length - 1];
+  if (node.type === "variable") {
+    const glyph = GLYPH[node.status] || "";
+    return glyph ? `${glyph}  ${node.name}` : node.name;
+  }
+  if (node.type === "file") {
+    const parts = node.name.split("/");
+    return parts[parts.length - 1];
+  }
+  return node.name;
 }
 
 function toElements(graph) {
   const nodes = graph.nodes.map((n) => ({
-    data: { id: n.id, label: label(n), type: n.type, status: n.status || "", name: n.name, file: n.file || "", line: n.line || 0 },
+    data: {
+      id: n.id,
+      label: label(n),
+      type: n.type,
+      status: n.status || "",
+      name: n.name,
+      file: n.file || "",
+      line: n.line || 0,
+      category: n.category || "",
+    },
   }));
 
   // Cytoscape drops edges whose endpoints are absent, so filter defensively.
@@ -87,20 +190,29 @@ function render(doc) {
     `${doc.files.length} files · ${doc.variables.length} variables · ` +
     `${counts.ok} ok, ${counts.missing} missing, ${counts.unused} unused`;
 
+  if (force) force.destroy();
   if (cy) cy.destroy();
 
   cy = cytoscape({
     container: el("graph"),
     elements: toElements(doc.graph),
-    style: STYLE,
-    layout: { name: "cose", animate: false, nodeRepulsion: 9000, idealEdgeLength: 90, padding: 40 },
+    style: style(),
+    // Seed positions on a circle, then hand over to the simulation. A ring
+    // gives the forces something to expand from without any node pair
+    // starting coincident.
+    layout: { name: "circle", animate: false, padding: 60 },
     wheelSensitivity: 0.2,
+    minZoom: 0.15,
+    maxZoom: 3,
   });
 
-  cy.on("tap", "node", (event) => showDetails(event.target));
+  cy.on("tap", "node", (event) => select(event.target));
   cy.on("tap", (event) => {
-    if (event.target === cy) hideDetails();
+    if (event.target === cy) clearSelection();
   });
+
+  force = new Force(cy);
+  force.setEnabled(el("physics").classList.contains("active"));
 
   applyFilter();
 
@@ -108,6 +220,7 @@ function render(doc) {
     show("No configuration found in this project.");
   } else {
     statusEl.hidden = true;
+    cy.fit(undefined, 50);
   }
 }
 
@@ -116,16 +229,16 @@ function line(loc) {
 }
 
 function list(items) {
-  if (items.length === 0) return "<p class='muted'>none</p>";
-  return `<ul>${items.map((i) => `<li>${escape(i)}</li>`).join("")}</ul>`;
+  if (items.length === 0) return `<ul><li class="note">none</li></ul>`;
+  return `<ul>${items.map((i) => `<li>${escapeHTML(i)}</li>`).join("")}</ul>`;
 }
 
-function escape(s) {
+function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
-function showDetails(node) {
+function select(node) {
   const type = node.data("type");
   const name = node.data("name");
 
@@ -134,59 +247,58 @@ function showDetails(node) {
   if (type === "variable") {
     const v = variables.get(name) || {};
     const status = v.status || "";
+    const glyph = GLYPH[status];
 
-    html = `<h2>${escape(name)}</h2>
-      <span class="badge ${escape(status)}">${escape(status)}</span>
-      <h3>Sources</h3>
+    html = `<h2>${escapeHTML(name)}</h2>
+      <span class="badge ${escapeHTML(status)}">${glyph ? `<span class="glyph">${glyph}</span>` : ""}${escapeHTML(status)}</span>
+      <h3>Comes from</h3>
       ${list((v.sources || []).map((s) => {
         if (s.derivedFrom?.length) return `${line(s.location)} — derived from ${s.derivedFrom.join(", ")}`;
         if (s.fromDefault) return `${line(s.location)} — compose default`;
         return line(s.location);
       }))}
       <h3>Passed to</h3>
-      ${list((v.passedTo || []).map((p) => `${p.service} (${line(p.location)})`))}
+      ${list((v.passedTo || []).map((p) => `${p.service} — ${line(p.location)}`))}
       <h3>Used in</h3>
       ${list((v.consumers || []).map(line))}`;
   } else {
-    const heading = type === "service" ? "Service" : "File";
-    const defines = connected(node, "defines", "source");
-    const receives = connected(node, "passed_to", "target");
-    const consumes = connected(node, "consumed_by", "target");
+    const kind = type === "service" ? "Container" : node.data("category") || "File";
+    const where = type === "service" ? `${node.data("file")}:${node.data("line")}` : "";
 
-    html = `<h2>${escape(name)}</h2>
-      <p class="muted">${escape(heading)}${node.data("file") && type === "service" ? ` · ${escape(node.data("file"))}:${node.data("line")}` : ""}</p>`;
+    html = `<h2>${escapeHTML(name)}</h2>
+      <p class="note">${escapeHTML(kind)}${where ? ` · ${escapeHTML(where)}` : ""}</p>`;
 
     if (type === "file") {
-      html += `<h3>Defines</h3>${list(defines)}<h3>Reads</h3>${list(consumes)}`;
+      html += `<h3>Defines</h3>${list(related(node, "defines", "out"))}
+        <h3>Reads</h3>${list(related(node, "consumed_by", "in"))}`;
     } else {
-      html += `<h3>Receives</h3>${list(receives)}`;
+      html += `<h3>Receives</h3>${list(related(node, "passed_to", "in"))}`;
     }
   }
 
   detailsBody.innerHTML = html;
   detailsEl.hidden = false;
 
-  cy.elements().removeClass("highlighted");
-  node.closedNeighborhood().addClass("highlighted");
+  cy.elements().removeClass("selected");
+  node.closedNeighborhood().addClass("selected");
 }
 
-// connected collects the variable names on the far side of an edge kind.
-// which says whether this node sits at the edge's source or target.
-function connected(node, relationship, which) {
-  const edges = which === "source"
+// related collects the variable names on the far side of an edge kind.
+function related(node, relationship, direction) {
+  const edges = direction === "out"
     ? node.outgoers(`edge[relationship="${relationship}"]`)
     : node.incomers(`edge[relationship="${relationship}"]`);
 
   return edges
-    .map((e) => (which === "source" ? e.target() : e.source()))
+    .map((e) => (direction === "out" ? e.target() : e.source()))
     .filter((n) => n.data("type") === "variable")
     .map((n) => n.data("name"))
     .sort();
 }
 
-function hideDetails() {
+function clearSelection() {
   detailsEl.hidden = true;
-  if (cy) cy.elements().removeClass("highlighted");
+  if (cy) cy.elements().removeClass("selected");
 }
 
 function applyFilter() {
@@ -195,23 +307,22 @@ function applyFilter() {
   cy.elements().removeClass("dimmed");
   if (filter === "all") return;
 
-  // Keep the matching variables plus whatever they connect to, so the
-  // surviving nodes still read as a flow rather than as loose dots.
-  const matches = cy.nodes(`node[status="${filter}"]`);
-  const keep = matches.closedNeighborhood();
+  // Keep the matching variables plus whatever they connect to, so what
+  // survives still reads as a flow rather than as loose dots.
+  const keep = cy.nodes(`node[status="${filter}"]`).closedNeighborhood();
   cy.elements().difference(keep).addClass("dimmed");
 }
 
 function applySearch(term) {
   if (!cy) return;
 
-  cy.elements().removeClass("highlighted");
+  cy.elements().removeClass("hit");
   const q = term.trim().toLowerCase();
   if (!q) return;
 
   const hits = cy.nodes().filter((n) => n.data("name").toLowerCase().includes(q));
-  hits.addClass("highlighted");
-  if (hits.length > 0) cy.fit(hits, 60);
+  hits.addClass("hit");
+  if (hits.length > 0) cy.fit(hits, 80);
 }
 
 function show(message, isError = false) {
@@ -222,13 +333,11 @@ function show(message, isError = false) {
 
 async function load() {
   show("Scanning…");
-  hideDetails();
+  clearSelection();
 
   try {
     const response = await fetch("api/graph");
-    if (!response.ok) {
-      throw new Error(await response.text() || response.statusText);
-    }
+    if (!response.ok) throw new Error((await response.text()) || response.statusText);
     render(await response.json());
   } catch (err) {
     show(`Could not load the graph: ${err.message}`, true);
@@ -236,12 +345,20 @@ async function load() {
 }
 
 el("refresh").addEventListener("click", load);
-el("close-details").addEventListener("click", hideDetails);
+el("close-details").addEventListener("click", clearSelection);
 el("search").addEventListener("input", (e) => applySearch(e.target.value));
 
-for (const button of document.querySelectorAll(".filters button")) {
+el("physics").addEventListener("click", () => {
+  const button = el("physics");
+  const on = !button.classList.contains("active");
+  button.classList.toggle("active", on);
+  button.setAttribute("aria-pressed", String(on));
+  if (force) force.setEnabled(on);
+});
+
+for (const button of document.querySelectorAll(".segmented button")) {
   button.addEventListener("click", () => {
-    for (const other of document.querySelectorAll(".filters button")) {
+    for (const other of document.querySelectorAll(".segmented button")) {
       other.classList.toggle("active", other === button);
     }
     filter = button.dataset.filter;
@@ -250,7 +367,13 @@ for (const button of document.querySelectorAll(".filters button")) {
 }
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") hideDetails();
+  if (e.key === "Escape") clearSelection();
+});
+
+// Restyling on a theme change keeps the canvas in step with the CSS, which
+// Cytoscape cannot read on its own.
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (cy) cy.style(style()).update();
 });
 
 fetch("api/meta")

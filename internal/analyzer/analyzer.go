@@ -82,6 +82,10 @@ func Analyze(res *scanner.Result) *Report {
 				// Held back until every variable is known.
 				derivations = append(derivations, occ)
 			}
+
+			if occ.Service == "" {
+				v.Consumers = append(v.Consumers, occ.Location)
+			}
 		case parser.KindConsumption:
 			v.Consumers = append(v.Consumers, occ.Location)
 		}

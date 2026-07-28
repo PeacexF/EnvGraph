@@ -79,6 +79,48 @@ func TestRecognisedFileNames(t *testing.T) {
 		"docker-compose.override.yaml", "docker-compose.yml", "main.go", "prod.env")
 }
 
+func TestRecognisedDockerfilesAndJavaScript(t *testing.T) {
+	root := project(t, map[string]string{
+		"Dockerfile":      "ENV A=1\n",
+		"Dockerfile.prod": "ENV B=2\n",
+		"api.Dockerfile":  "ENV C=3\n",
+		"app.js":          "process.env.D\n",
+		"app.jsx":         "process.env.E\n",
+		"app.mjs":         "process.env.F\n",
+		"app.cjs":         "process.env.G\n",
+		"app.ts":          "process.env.H\n",
+		"app.tsx":         "process.env.I\n",
+	})
+
+	assertPaths(t, scan(t, root, scanner.Options{}),
+		"Dockerfile", "Dockerfile.prod", "api.Dockerfile",
+		"app.cjs", "app.js", "app.jsx", "app.mjs", "app.ts", "app.tsx")
+}
+
+func TestDeclarationFilesAreSkipped(t *testing.T) {
+	// A .d.ts holds types, never a call site.
+	root := project(t, map[string]string{
+		"types.d.ts": "declare const x: string\n",
+		"app.ts":     "process.env.REAL\n",
+	})
+
+	assertPaths(t, scan(t, root, scanner.Options{}), "app.ts")
+}
+
+func TestJavaScriptTestFiles(t *testing.T) {
+	root := project(t, map[string]string{
+		"app.js":      "process.env.A\n",
+		"app.test.js": "process.env.B\n",
+		"app.spec.ts": "process.env.C\n",
+	})
+
+	assertPaths(t, scan(t, root, scanner.Options{}), "app.js")
+
+	if got := len(scan(t, root, scanner.Options{IncludeTests: true}).Files); got != 3 {
+		t.Errorf("scanned %d files with IncludeTests, want 3", got)
+	}
+}
+
 func TestUnrecognisedFileNames(t *testing.T) {
 	root := project(t, map[string]string{
 		".env":                 "A=1\n",
@@ -100,6 +142,8 @@ func TestFileTypes(t *testing.T) {
 		"docker-compose.yml": "services:\n  api:\n    image: x\n",
 		"main.go":            goSource,
 		"app.py":             "import os\n",
+		"Dockerfile":         "ENV A=1\n",
+		"app.ts":             "process.env.B\n",
 	})
 
 	want := map[string]scanner.FileType{
@@ -107,6 +151,8 @@ func TestFileTypes(t *testing.T) {
 		"docker-compose.yml": scanner.TypeCompose,
 		"main.go":            scanner.TypeGo,
 		"app.py":             scanner.TypePython,
+		"Dockerfile":         scanner.TypeDockerfile,
+		"app.ts":             scanner.TypeJavaScript,
 	}
 
 	for _, f := range scan(t, root, scanner.Options{}).Files {

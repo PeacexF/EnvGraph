@@ -148,13 +148,14 @@ none
 
 | Source                    | Status      | Detects                                        |
 | ------------------------- | ----------- | ---------------------------------------------- |
-| `.env` files              | Supported   | assignments, quoting, multi-line values         |
+| `.env` files              | Supported   | assignments, quoting, multi-line values          |
 | Docker Compose            | Supported   | `environment`, `env_file`, `${VAR}` substitution |
-| Go environment access     | Supported   | `os.Getenv`, `os.LookupEnv`                     |
-| Python environment access | Supported   | `os.getenv`, `os.environ[...]`, `environ.get`   |
-| Dockerfile                | Planned     |                                                |
-| GitHub Actions            | Planned     |                                                |
-| Kubernetes manifests      | Planned     |                                                |
+| Dockerfile                | Supported   | `ENV`, `ARG`, `$VAR` in values, continuations    |
+| Go                        | Supported   | `os.Getenv`, `os.LookupEnv`                      |
+| Python                    | Supported   | `os.getenv`, `os.environ[...]`, `environ.get`    |
+| JavaScript / TypeScript   | Supported   | `process.env`, `import.meta.env`, destructuring  |
+| GitHub Actions            | Planned     |                                                  |
+| Kubernetes manifests      | Planned     |                                                  |
 
 More sources will be added gradually.
 
@@ -204,9 +205,13 @@ Explore it in a browser:
 envgraph serve .
 ```
 
-Opens an interactive graph on `http://127.0.0.1:8080`. Click a node to see
-where a variable comes from and where it goes; filter to missing or unused.
-The project is re-scanned on every request, so a reload picks up your edits.
+Opens an interactive graph on `http://127.0.0.1:8080`. The layout is a live
+force simulation — drag a node and its neighbours follow, or switch **Physics**
+off to freeze it. Click a node for where a variable comes from and where it
+goes; filter to missing or unused. The project is re-scanned on every request,
+so a reload picks up your edits.
+
+Values are never sent to the browser unless you pass `--show-values`.
 
 Write the graph as JSON:
 
@@ -229,6 +234,7 @@ Try it against the bundled examples:
 ```bash
 envgraph scan examples/simple-go
 envgraph check examples/compose-python
+envgraph serve examples/node-app
 ```
 
 ---
@@ -243,6 +249,9 @@ as supplying a value is deliberately strict:
 | `DATABASE_URL=postgres://...` in `.env` | yes             |
 | `LOG_LEVEL: info` in compose        | yes                 |
 | `PORT: ${PORT:-8080}` in compose    | yes, via the fallback |
+| `ENV PORT=3000` in a Dockerfile     | yes                 |
+| `ARG VERSION=1` in a Dockerfile     | yes, via the default |
+| `ARG VERSION` in a Dockerfile       | no — it needs `--build-arg` at build time |
 | `DATABASE_URL: ${DATABASE_URL}`     | no — it passes a value along without supplying one |
 | `- DATABASE_URL` in compose         | no — it forwards a host variable |
 

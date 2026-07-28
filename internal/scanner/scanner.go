@@ -10,8 +10,10 @@ import (
 
 	"github.com/PeacexF/EnvGraph/internal/parser"
 	"github.com/PeacexF/EnvGraph/internal/parser/compose"
+	"github.com/PeacexF/EnvGraph/internal/parser/dockerfile"
 	"github.com/PeacexF/EnvGraph/internal/parser/env"
 	"github.com/PeacexF/EnvGraph/internal/parser/golang"
+	"github.com/PeacexF/EnvGraph/internal/parser/javascript"
 	"github.com/PeacexF/EnvGraph/internal/parser/python"
 )
 
@@ -19,10 +21,12 @@ import (
 type FileType string
 
 const (
-	TypeEnv     FileType = "env"
-	TypeCompose FileType = "compose"
-	TypeGo      FileType = "go"
-	TypePython  FileType = "python"
+	TypeEnv        FileType = "env"
+	TypeCompose    FileType = "compose"
+	TypeDockerfile FileType = "dockerfile"
+	TypeGo         FileType = "go"
+	TypePython     FileType = "python"
+	TypeJavaScript FileType = "javascript"
 )
 
 // maxFileSize skips anything too large to be hand-written configuration.
@@ -157,10 +161,14 @@ func parse(t FileType, rel string, content []byte) (parser.Result, error) {
 		return env.Parse(rel, content)
 	case TypeCompose:
 		return compose.Parse(rel, content)
+	case TypeDockerfile:
+		return dockerfile.Parse(rel, content)
 	case TypeGo:
 		return golang.Parse(rel, content)
 	case TypePython:
 		return python.Parse(rel, content)
+	case TypeJavaScript:
+		return javascript.Parse(rel, content)
 	default:
 		return parser.Result{}, nil
 	}
@@ -172,12 +180,36 @@ func classify(name string) (FileType, bool) {
 		return TypeEnv, true
 	case isComposeFile(name):
 		return TypeCompose, true
+	case isDockerfile(name):
+		return TypeDockerfile, true
 	case strings.HasSuffix(name, ".go"):
 		return TypeGo, true
 	case strings.HasSuffix(name, ".py"):
 		return TypePython, true
+	case isJavaScript(name):
+		return TypeJavaScript, true
 	}
 	return "", false
+}
+
+// isDockerfile matches Dockerfile, Dockerfile.prod, and api.Dockerfile.
+func isDockerfile(name string) bool {
+	return name == "Dockerfile" ||
+		strings.HasPrefix(name, "Dockerfile.") ||
+		strings.HasSuffix(name, ".Dockerfile")
+}
+
+// isJavaScript matches the JavaScript and TypeScript extensions. Declaration files are skipped: they are types, never a call site.
+func isJavaScript(name string) bool {
+	if strings.HasSuffix(name, ".d.ts") {
+		return false
+	}
+	for _, ext := range []string{".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"} {
+		if strings.HasSuffix(name, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 // isEnvFile matches .env, .env.local, and prod.env. Templates such as .env.example count too: they document what a project expects.
@@ -201,6 +233,9 @@ func isTest(t FileType, name string) bool {
 		return strings.HasSuffix(name, "_test.go")
 	case TypePython:
 		return strings.HasPrefix(name, "test_") || strings.HasSuffix(name, "_test.py")
+	case TypeJavaScript:
+		base := strings.TrimSuffix(name, filepath.Ext(name))
+		return strings.HasSuffix(base, ".test") || strings.HasSuffix(base, ".spec")
 	}
 	return false
 }

@@ -14,15 +14,18 @@
     </div>
 
     <div class="controls">
-      <input id="search" type="search" placeholder="Search variables and files" autocomplete="off">
+      <input id="search" type="search" placeholder="Search" autocomplete="off">
 
-      <div class="filters" role="group" aria-label="Filter by status">
+      <div class="segmented" role="group" aria-label="Filter by status">
         <button type="button" data-filter="all" class="active">All</button>
-        <button type="button" data-filter="missing">Missing <span id="count-missing">0</span></button>
-        <button type="button" data-filter="unused">Unused <span id="count-unused">0</span></button>
+        <button type="button" data-filter="missing"><span class="glyph">!</span> Missing <span class="count" id="count-missing">0</span></button>
+        <button type="button" data-filter="unused"><span class="glyph">?</span> Unused <span class="count" id="count-unused">0</span></button>
       </div>
 
-      <button type="button" id="refresh" title="Re-scan the project">Refresh</button>
+      <button type="button" id="physics" class="toggle active" aria-pressed="true" title="Continuous force simulation">
+        Physics
+      </button>
+      <button type="button" id="refresh" title="Re-scan the project">Re-scan</button>
     </div>
   </header>
 
@@ -39,10 +42,11 @@
 
   <footer>
     <span class="legend"><i class="swatch ok"></i> ok</span>
-    <span class="legend"><i class="swatch missing"></i> missing</span>
-    <span class="legend"><i class="swatch unused"></i> unused</span>
-    <span class="legend"><i class="swatch file"></i> file</span>
-    <span class="legend"><i class="swatch service"></i> service</span>
+    <span class="legend"><i class="swatch missing"></i> <span class="glyph">!</span> missing</span>
+    <span class="legend"><i class="swatch unused"></i> <span class="glyph">?</span> unused</span>
+    <span class="sep"></span>
+    <span class="legend"><i class="swatch shape-file"></i> file</span>
+    <span class="legend"><i class="swatch shape-service"></i> service</span>
     <span class="spacer"></span>
     <span id="summary" class="muted"></span>
   </footer>

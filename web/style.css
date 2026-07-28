@@ -1,30 +1,46 @@
+/* Palette roles. Status colours are fixed across modes; chrome is stepped
+   per surface. Status is never carried by colour alone — nodes and the legend
+   pair it with a shape and a glyph, because ok-green and missing-red are
+   near-identical under deuteranopia. */
 :root {
-  --bg: #ffffff;
-  --panel: #f7f8fa;
-  --border: #dfe3e8;
-  --text: #1c1f23;
-  --muted: #6b7280;
-  --accent: #2563eb;
-  --ok: #16a34a;
-  --missing: #dc2626;
-  --unused: #d97706;
-  --file: #64748b;
-  --service: #7c3aed;
+  color-scheme: light;
+
+  --surface: #fcfcfb;
+  --plane: #f9f9f7;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --hairline: #e1e0d9;
+  --ring: rgba(11, 11, 11, 0.10);
+
+  --accent: #2a78d6;
+  --service: #4a3aa7;
+  --file: #898781;
+
+  --ok: #0ca30c;
+  --missing: #d03b3b;
+  --unused: #fab219;
+
+  --edge: #c3c2b7;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #14171a;
-    --panel: #1b1f24;
-    --border: #2c333b;
-    --text: #e6e8eb;
-    --muted: #9aa3ad;
-    --accent: #60a5fa;
-    --ok: #4ade80;
-    --missing: #f87171;
-    --unused: #fbbf24;
-    --file: #94a3b8;
-    --service: #a78bfa;
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+
+    --surface: #1a1a19;
+    --plane: #0d0d0d;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --hairline: #2c2c2a;
+    --ring: rgba(255, 255, 255, 0.10);
+
+    --accent: #3987e5;
+    --service: #9085e9;
+    --file: #898781;
+
+    --edge: #383835;
   }
 }
 
@@ -35,117 +51,164 @@ body {
   height: 100vh;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  background: var(--bg);
-  color: var(--text);
-  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--plane);
+  color: var(--ink);
+  font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 header, footer {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  gap: 10px;
+  padding: 9px 14px;
+  background: var(--plane);
+  border-bottom: 1px solid var(--hairline);
 }
 
 footer {
   border-bottom: none;
-  border-top: 1px solid var(--border);
-  font-size: 12px;
+  border-top: 1px solid var(--hairline);
+  font-size: 11px;
+  color: var(--muted);
+  gap: 14px;
 }
 
-.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand { display: flex; align-items: baseline; gap: 9px; }
+.brand strong { letter-spacing: -0.01em; }
 .muted { color: var(--muted); }
 .spacer { flex: 1; }
+.sep { width: 1px; height: 12px; background: var(--hairline); }
 
 .controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-left: auto;
   flex-wrap: wrap;
 }
 
 input[type="search"] {
-  width: 240px;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
+  width: 180px;
+  padding: 5px 9px;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  background: var(--surface);
   color: inherit;
   font: inherit;
 }
 
-input[type="search"]:focus-visible,
-button:focus-visible {
+input[type="search"]::placeholder { color: var(--muted); }
+
+input:focus-visible, button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
 button {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-2);
   font: inherit;
   cursor: pointer;
 }
 
-button:hover { border-color: var(--accent); }
-button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:hover { border-color: var(--muted); color: var(--ink); }
 
-.filters { display: flex; gap: 4px; }
-.filters span { opacity: 0.7; margin-left: 4px; }
+.segmented { display: flex; gap: 4px; }
+.segmented button.active,
+button.toggle.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
 
-main { position: relative; overflow: hidden; }
+.count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* The glyph is the secondary encoding: status must survive without hue. */
+.glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  background: currentColor;
+  color: var(--surface);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.segmented button .glyph { color: inherit; background: none; font-size: 11px; }
+.segmented button.active .glyph { color: #fff; }
+
+main { position: relative; overflow: hidden; background: var(--surface); }
 #graph { width: 100%; height: 100%; }
 
 #details {
   position: absolute;
   top: 12px;
   right: 12px;
-  width: min(340px, calc(100% - 24px));
+  width: min(320px, calc(100% - 24px));
   max-height: calc(100% - 24px);
   overflow: auto;
   padding: 14px 16px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  background: var(--plane);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.14);
 }
 
 #close-details {
   float: right;
   border: none;
   background: none;
-  font-size: 20px;
-  line-height: 1;
-  padding: 0 4px;
+  font-size: 18px;
+  padding: 0 2px;
   color: var(--muted);
 }
 
 #details h2 {
-  margin: 0 0 2px;
-  font-size: 16px;
+  margin: 0 0 6px;
+  font-size: 15px;
   word-break: break-all;
 }
 
 #details h3 {
   margin: 14px 0 4px;
-  font-size: 11px;
-  letter-spacing: 0.06em;
+  font-size: 10px;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-#details ul { margin: 0; padding-left: 16px; }
-#details li { word-break: break-all; }
+#details ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#details li {
+  padding: 2px 0;
+  color: var(--ink-2);
+  word-break: break-all;
+  font-variant-numeric: tabular-nums;
+}
+
+#details .note { color: var(--muted); }
 
 .badge {
-  display: inline-block;
-  padding: 1px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 6px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
@@ -154,14 +217,16 @@ main { position: relative; overflow: hidden; }
 
 .badge.ok { background: var(--ok); }
 .badge.missing { background: var(--missing); }
-.badge.unused { background: var(--unused); }
+.badge.unused { background: var(--unused); color: #3a2a00; }
+.badge .glyph { background: rgb(255 255 255 / 0.9); color: inherit; }
+.badge.ok .glyph, .badge.missing .glyph { color: #000; }
 
 .overlay {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--muted);
   padding: 24px;
   text-align: center;
@@ -170,17 +235,27 @@ main { position: relative; overflow: hidden; }
 .overlay[hidden] { display: none; }
 .overlay.error { color: var(--missing); }
 
-.legend { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+.legend { display: inline-flex; align-items: center; gap: 5px; }
 
 .swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
+  width: 11px;
+  height: 11px;
   display: inline-block;
+  border-radius: 3px;
 }
 
 .swatch.ok { background: var(--ok); }
 .swatch.missing { background: var(--missing); }
 .swatch.unused { background: var(--unused); }
-.swatch.file { background: var(--file); }
-.swatch.service { background: var(--service); }
+
+/* Shape carries type, matching the node shapes on the canvas. */
+.swatch.shape-file {
+  background: var(--file);
+  border-radius: 50%;
+}
+
+.swatch.shape-service {
+  background: var(--service);
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  border-radius: 0;
+}

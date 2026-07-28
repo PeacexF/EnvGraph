@@ -1,17 +1,18 @@
-package compose
+package interpolate
 
 import "strings"
 
-type reference struct {
-	name string
+// Reference is one $VAR or ${VAR...} mention.
+type Reference struct {
+	Name string
 
-	// hasDefault covers ${VAR:-x} and ${VAR-x}, which always yield a value.
-	hasDefault bool
+	// HasDefault covers ${VAR:-x} and ${VAR-x}, which always yield a value.
+	HasDefault bool
 }
 
-// findReferences extracts $VAR and ${VAR...} mentions. "$$" is a literal "$".
-func findReferences(s string) []reference {
-	var refs []reference
+// Find extracts the references in a value. "$$" is a literal "$".
+func Find(s string) []Reference {
+	var refs []Reference
 
 	for i := 0; i < len(s); i++ {
 		if s[i] != '$' {
@@ -29,7 +30,7 @@ func findReferences(s string) []reference {
 		if s[i+1] != '{' {
 			name, n := scanName(s[i+1:])
 			if name != "" {
-				refs = append(refs, reference{name: name})
+				refs = append(refs, Reference{Name: name})
 			}
 			i += n
 			continue
@@ -47,22 +48,34 @@ func findReferences(s string) []reference {
 			continue
 		}
 
-		ref := reference{name: name}
+		ref := Reference{Name: name}
 		if op := inner[n:]; strings.HasPrefix(op, ":-") || strings.HasPrefix(op, "-") {
-			ref.hasDefault = true
+			ref.HasDefault = true
 		}
 		refs = append(refs, ref)
 
 		// The default may interpolate too: ${HOST:-${FALLBACK}}.
 		if n < len(inner) {
-			refs = append(refs, findReferences(inner[n:])...)
+			refs = append(refs, Find(inner[n:])...)
 		}
 	}
 
 	return refs
 }
 
-// matchBrace takes a string starting with "{" and returns the index of the brace closing it, or -1.
+// Unresolved returns the names that must come from elsewhere, dropping any reference that carries its own fallback.
+func Unresolved(refs []Reference) []string {
+	out := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		if !ref.HasDefault {
+			out = append(out, ref.Name)
+		}
+	}
+	return out
+}
+
+// matchBrace takes a string starting with "{" and returns the index of the
+// brace closing it, or -1.
 func matchBrace(s string) int {
 	depth := 0
 	for i := 0; i < len(s); i++ {

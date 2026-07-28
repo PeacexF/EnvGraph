@@ -268,12 +268,21 @@ func TestViewerServesTheExamples(t *testing.T) {
 				}
 			}
 
-			// The page and every asset it references must load.
+			// The page must reference what it loads directly; force.js
+			// arrives through app.js's import rather than a tag.
 			page := string(getBody(t, ts.URL+"/"))
-			for _, asset := range []string{"/app.js", "/style.css", "/vendor/cytoscape.min.js"} {
-				if !strings.Contains(page, strings.TrimPrefix(asset, "/")) {
+			for _, asset := range []string{"app.js", "style.css", "vendor/cytoscape.min.js"} {
+				if !strings.Contains(page, asset) {
 					t.Errorf("the page does not reference %s", asset)
 				}
+			}
+
+			app := string(getBody(t, ts.URL+"/app.js"))
+			if !strings.Contains(app, "force.js") {
+				t.Error("app.js does not import force.js")
+			}
+
+			for _, asset := range []string{"/app.js", "/force.js", "/style.css", "/vendor/cytoscape.min.js"} {
 				getBody(t, ts.URL+asset)
 			}
 		})

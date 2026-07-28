@@ -210,7 +210,7 @@ func TestAPIResponsesAreNotCached(t *testing.T) {
 func TestStaticAssetsAreServed(t *testing.T) {
 	handler := server.New(server.Options{Root: sample(t)})
 
-	for _, path := range []string{"/", "/app.js", "/style.css", "/vendor/cytoscape.min.js"} {
+	for _, path := range []string{"/", "/app.js", "/force.js", "/style.css", "/vendor/cytoscape.min.js"} {
 		rec := get(t, handler, path)
 		if rec.Code != http.StatusOK {
 			t.Errorf("GET %s = %d, want 200", path, rec.Code)
@@ -239,7 +239,7 @@ func TestServedIndexIsTheViewer(t *testing.T) {
 	handler := server.New(server.Options{Root: sample(t)})
 
 	body := get(t, handler, "/").Body.String()
-	for _, want := range []string{"<title>EnvGraph</title>", "app.js", "cytoscape.min.js", `id="graph"`} {
+	for _, want := range []string{"<title>EnvGraph</title>", "app.js", "cytoscape.min.js", `id="graph"`, `id="physics"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("index does not reference %q", want)
 		}

@@ -150,6 +150,8 @@ jobs:
           done
 
           curl -sf http://127.0.0.1:8137/ | grep -q "<title>EnvGraph</title>"
+          curl -sf http://127.0.0.1:8137/app.js >/dev/null
+          curl -sf http://127.0.0.1:8137/force.js >/dev/null
           curl -sf http://127.0.0.1:8137/vendor/cytoscape.min.js >/dev/null
           curl -sf http://127.0.0.1:8137/api/graph | grep -q '"nodes"'
 
