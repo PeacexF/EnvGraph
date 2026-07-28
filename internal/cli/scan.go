@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -17,6 +18,7 @@ func newScanCmd() *cobra.Command {
 		format     string
 		output     string
 		showValues bool
+		only       []string
 	)
 
 	cmd := &cobra.Command{
@@ -38,14 +40,19 @@ func newScanCmd() *cobra.Command {
 			}
 			defer closeOut()
 
+			statuses, err := parseOnly(only)
+			if err != nil {
+				return err
+			}
+
 			switch format {
 			case "text":
-				writeReport(w, res, report, showValues)
+				writeReport(w, res, report, statuses, showValues)
 				return nil
 			case "json":
 				enc := json.NewEncoder(w)
 				enc.SetIndent("", "  ")
-				return enc.Encode(analyzer.NewDocument(res, report, showValues))
+				return enc.Encode(analyzer.NewDocument(res, report.Only(statuses), showValues))
 			default:
 				return fmt.Errorf("unknown format %q: use text or json", format)
 			}
@@ -57,8 +64,28 @@ func newScanCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&output, "output", "o", "", "write to a file instead of stdout")
 	cmd.Flags().BoolVar(&showValues, "show-values", false,
 		"print the value assigned to each variable (these are often secrets)")
+	cmd.Flags().StringSliceVar(&only, "only", nil,
+		"list only these statuses: ok, missing, unused (repeatable)")
 
 	return cmd
+}
+
+// parseOnly turns the --only values into a status set. Nil means everything.
+func parseOnly(values []string) (map[analyzer.Status]bool, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+
+	out := make(map[analyzer.Status]bool, len(values))
+	for _, value := range values {
+		switch status := analyzer.Status(strings.ToLower(strings.TrimSpace(value))); status {
+		case analyzer.StatusOK, analyzer.StatusMissing, analyzer.StatusUnused:
+			out[status] = true
+		default:
+			return nil, fmt.Errorf("unknown status %q: use ok, missing, or unused", value)
+		}
+	}
+	return out, nil
 }
 
 // openOutput returns the destination and a close function. An empty path, or "-", means the command's own stdout, which must not be closed.

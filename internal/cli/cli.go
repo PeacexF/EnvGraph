@@ -40,7 +40,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	root.AddCommand(newScanCmd(), newCheckCmd(), newExportCmd(), newServeCmd())
+	root.AddCommand(newScanCmd(), newCheckCmd(), newExplainCmd(), newExportCmd(), newServeCmd())
 
 	if err := root.Execute(); err != nil {
 		// A failed check has already listed its findings.
@@ -106,21 +106,30 @@ func (f *scanFlags) scanOptions(cfg *config.Config) scanner.Options {
 
 // run scans and analyzes. Parse failures are reported but do not stop the run, so one malformed file cannot hide the rest of a project.
 func (f *scanFlags) run(cmd *cobra.Command, path string) (*scanner.Result, *analyzer.Report, error) {
-	cfg, err := f.config(path)
+	res, full, cfg, err := f.analyze(cmd, path)
 	if err != nil {
 		return nil, nil, err
+	}
+	return res, full.Without(cfg.IgnoresVariable), nil
+}
+
+// analyze is run without the ignore rules applied, which `explain` needs so it can say "that variable is ignored" rather than "no such variable".
+func (f *scanFlags) analyze(cmd *cobra.Command, path string) (*scanner.Result, *analyzer.Report, *config.Config, error) {
+	cfg, err := f.config(path)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	res, err := scanner.Scan(path, f.scanOptions(cfg))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	for _, e := range res.Errors {
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %v\n", e)
 	}
 
-	return res, analyzer.Analyze(res).Without(cfg.IgnoresVariable), nil
+	return res, analyzer.Analyze(res), cfg, nil
 }
 
 func defaultPath(args []string) string {

@@ -585,3 +585,163 @@ func TestIgnoredVariablesCannotFailCheck(t *testing.T) {
 		t.Errorf("exit code = %d, want 0 once ignored", res.code)
 	}
 }
+
+func TestExplainTracesAVariable(t *testing.T) {
+	res := run("explain", "DATABASE_URL", sample(t))
+
+	if res.code != 0 {
+		t.Fatalf("exit code = %d, want 0: %s", res.code, res)
+	}
+	assertContains(t, res.stdout,
+		"DATABASE_URL", "ok",
+		"from", ".env:1",
+		"into", "api",
+		"read", "main.go:6",
+	)
+}
+
+func TestExplainDefaultsToTheCurrentDirectory(t *testing.T) {
+	root := project(t, map[string]string{".env": "ONLY_HERE=1\n"})
+	t.Chdir(root)
+
+	if res := run("explain", "ONLY_HERE"); res.code != 0 {
+		t.Errorf("exit code = %d, want 0: %s", res.code, res)
+	}
+}
+
+func TestExplainOnAMissingVariableAdvises(t *testing.T) {
+	res := run("explain", "JWT_SECRET", sample(t))
+
+	if res.code != 0 {
+		t.Errorf("exit code = %d, want 0: the variable exists, it is just unsupplied", res.code)
+	}
+	assertContains(t, res.stdout, "missing", "nothing supplies this", "Nothing across")
+}
+
+func TestExplainOnAnUnusedVariableAdvises(t *testing.T) {
+	res := run("explain", "OLD_KEY", sample(t))
+
+	assertContains(t, res.stdout, "unused", "nothing reads it", "dead")
+}
+
+func TestExplainOnAnUnknownVariable(t *testing.T) {
+	res := run("explain", "NOT_A_THING", sample(t))
+
+	if res.code != 1 {
+		t.Errorf("exit code = %d, want 1", res.code)
+	}
+	assertContains(t, res.stdout, "No variable named NOT_A_THING")
+}
+
+func TestExplainSuggestsNearMisses(t *testing.T) {
+	res := run("explain", "database_url", sample(t))
+
+	if res.code != 1 {
+		t.Errorf("exit code = %d, want 1", res.code)
+	}
+	assertContains(t, res.stdout, "Did you mean", "DATABASE_URL")
+}
+
+func TestExplainReachesIgnoredVariables(t *testing.T) {
+	// Asking by name is deliberate, so an ignore rule should not hide it.
+	root := project(t, map[string]string{
+		".envgraph.yml": "ignore:\n  - HIDDEN\n",
+		".env":          "HIDDEN=1\n",
+	})
+
+	if res := run("scan", root); strings.Contains(res.stdout, "HIDDEN") {
+		t.Fatalf("scan should hide it:\n%s", res.stdout)
+	}
+
+	res := run("explain", "HIDDEN", root)
+	if res.code != 0 {
+		t.Errorf("exit code = %d, want 0", res.code)
+	}
+	assertContains(t, res.stdout, "HIDDEN", "Ignored by your configuration")
+}
+
+func TestExplainHidesValuesByDefault(t *testing.T) {
+	root := project(t, map[string]string{".env": "TOKEN=s3cret\n"})
+
+	if res := run("explain", "TOKEN", root); strings.Contains(res.stdout, "s3cret") {
+		t.Errorf("explain printed a secret without being asked:\n%s", res.stdout)
+	}
+	assertContains(t, run("explain", "TOKEN", root, "--show-values").stdout, "s3cret")
+}
+
+func TestExplainShowsWhereAValueComesFrom(t *testing.T) {
+	root := project(t, map[string]string{
+		".github/workflows/ci.yml": "on: push\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n" +
+			"    env:\n      API_KEY: ${{ secrets.API_KEY }}\n" +
+			"    steps:\n      - run: deploy --key \"$API_KEY\"\n",
+	})
+
+	assertContains(t, run("explain", "API_KEY", root).stdout, "GitHub secret", "deploy")
+}
+
+func TestExplainNeedsAVariableName(t *testing.T) {
+	if res := run("explain"); res.code != 1 {
+		t.Errorf("exit code = %d, want 1", res.code)
+	}
+}
+
+func TestScanOnlyFiltersTheListing(t *testing.T) {
+	res := run("scan", sample(t), "--only", "missing")
+
+	if res.code != 0 {
+		t.Fatalf("exit code = %d, want 0: %s", res.code, res)
+	}
+	assertContains(t, res.stdout, "JWT_SECRET")
+
+	for _, hidden := range []string{"DATABASE_URL  ok", "OLD_KEY  unused"} {
+		if strings.Contains(res.stdout, hidden) {
+			t.Errorf("--only missing still listed %q:\n%s", hidden, res.stdout)
+		}
+	}
+
+	// The tally stays honest about the whole project.
+	assertContains(t, res.stdout, "1 ok, 1 missing, 1 unused")
+}
+
+func TestScanOnlyAcceptsSeveralStatuses(t *testing.T) {
+	res := run("scan", sample(t), "--only", "missing,unused")
+
+	assertContains(t, res.stdout, "JWT_SECRET", "OLD_KEY")
+	if strings.Contains(res.stdout, "DATABASE_URL  ok") {
+		t.Errorf("an ok variable survived the filter:\n%s", res.stdout)
+	}
+}
+
+func TestScanOnlyRejectsUnknownStatuses(t *testing.T) {
+	res := run("scan", sample(t), "--only", "broken")
+
+	if res.code != 1 {
+		t.Errorf("exit code = %d, want 1", res.code)
+	}
+	assertContains(t, res.stderr, "unknown status")
+}
+
+func TestScanOnlyFiltersJSON(t *testing.T) {
+	res := run("scan", sample(t), "--format", "json", "--only", "missing")
+
+	var doc struct {
+		Variables []struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		} `json:"variables"`
+		Graph struct {
+			Nodes []struct{} `json:"nodes"`
+		} `json:"graph"`
+	}
+	if err := json.Unmarshal([]byte(res.stdout), &doc); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+
+	if len(doc.Variables) != 1 || doc.Variables[0].Status != "missing" {
+		t.Errorf("variables = %+v, want only the missing one", doc.Variables)
+	}
+	// The graph stays whole; filtering it would leave dangling edges.
+	if len(doc.Graph.Nodes) == 0 {
+		t.Error("the graph should not be emptied by a listing filter")
+	}
+}

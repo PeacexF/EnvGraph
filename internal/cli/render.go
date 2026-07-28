@@ -56,7 +56,7 @@ func statusColor(s analyzer.Status) string {
 }
 
 // writeReport prints every variable: where it comes from, where it is passed, and where it is read.
-func writeReport(w io.Writer, res *scanner.Result, report *analyzer.Report, showValues bool) {
+func writeReport(w io.Writer, res *scanner.Result, report *analyzer.Report, only map[analyzer.Status]bool, showValues bool) {
 	fmt.Fprintf(w, "%sScanned%s %d files, found %d variables\n\n",
 		bold, reset, len(res.Files), len(report.Variables))
 
@@ -66,6 +66,10 @@ func writeReport(w io.Writer, res *scanner.Result, report *analyzer.Report, show
 	}
 
 	for _, v := range report.Variables {
+		if only != nil && !only[v.Status] {
+			continue
+		}
+
 		fmt.Fprintf(w, "%s%s%s  %s%s%s\n",
 			bold, v.Name, reset, statusColor(v.Status), v.Status, reset)
 

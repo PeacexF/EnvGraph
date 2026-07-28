@@ -183,6 +183,31 @@ func status(v *Variable) Status {
 	}
 }
 
+// Only keeps the variables whose status is in the set. A nil set keeps all, so the no-filter case costs nothing.
+func (r *Report) Only(statuses map[Status]bool) *Report {
+	if statuses == nil {
+		return r
+	}
+
+	out := &Report{Variables: make([]Variable, 0, len(r.Variables))}
+	for _, v := range r.Variables {
+		if statuses[v.Status] {
+			out.Variables = append(out.Variables, v)
+		}
+	}
+	return out
+}
+
+// Find returns the variable by name.
+func (r *Report) Find(name string) (Variable, bool) {
+	for _, v := range r.Variables {
+		if v.Name == name {
+			return v, true
+		}
+	}
+	return Variable{}, false
+}
+
 // Missing returns the variables nothing supplies.
 func (r *Report) Missing() []Variable { return r.filter(StatusMissing) }
 

@@ -190,6 +190,26 @@ DATABASE_URL  ok
   used in    config/database.go:7
 ```
 
+Trace one variable end to end:
+
+```bash
+envgraph explain DATABASE_URL
+```
+
+```
+DATABASE_URL  ok
+
+from   .env:2
+
+into   api (docker-compose.yml:5)
+       worker (docker-compose.yml:15)
+
+read   config/database.go:7
+```
+
+For a variable that is missing it says what to do about it, and it answers
+even for variables an `ignore` rule hides from everything else.
+
 Fail when configuration is missing, which makes it usable as a CI step:
 
 ```bash
@@ -224,6 +244,7 @@ Useful flags:
 
 | Flag              | Effect                                            |
 | ----------------- | ------------------------------------------------- |
+| `--only <status>` | list only `ok`, `missing`, or `unused`            |
 | `--exclude <dir>` | skip additional directories                       |
 | `--ignore <name>` | drop variables, glob wildcards allowed            |
 | `--include-tests` | count usage in test files                         |
