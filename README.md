@@ -239,6 +239,21 @@ envgraph serve examples/node-app
 
 ---
 
+# Screenshots
+> Real runs on real projects, showing how it all works
+
+<div align="center">
+
+
+<picture>
+  <img src=".github/img/screenshots/summarybot.png" width="800" alt="summarybot">
+</picture>
+
+*[NewsSummaryBot](https://github.com/PeacexF/NewsSummaryBot)*
+
+</div>
+
+---
 # How variables are resolved
 
 A variable is **missing** when nothing supplies a value for it. What counts
