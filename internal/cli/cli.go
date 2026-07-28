@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/PeacexF/EnvGraph/internal/analyzer"
+	"github.com/PeacexF/EnvGraph/internal/config"
 	"github.com/PeacexF/EnvGraph/internal/scanner"
 )
 
@@ -63,6 +64,9 @@ func (f failure) Error() string { return fmt.Sprintf("exit status %d", f.code) }
 type scanFlags struct {
 	exclude      []string
 	includeTests bool
+	ignore       []string
+	configPath   string
+	noConfig     bool
 }
 
 func (f *scanFlags) register(cmd *cobra.Command) {
@@ -70,14 +74,44 @@ func (f *scanFlags) register(cmd *cobra.Command) {
 		"additional directory names to skip (repeatable)")
 	cmd.Flags().BoolVar(&f.includeTests, "include-tests", false,
 		"include test files when looking for variable usage")
+	cmd.Flags().StringSliceVar(&f.ignore, "ignore", nil,
+		"variable names to drop, glob wildcards allowed (repeatable)")
+	cmd.Flags().StringVar(&f.configPath, "config", "",
+		"path to .envgraph.yml (defaults to one in the scanned directory)")
+	cmd.Flags().BoolVar(&f.noConfig, "no-config", false,
+		"ignore any .envgraph.yml, including the built-in system variables")
+}
+
+// config resolves the file plus the flags layered on top.
+func (f *scanFlags) config(root string) (*config.Config, error) {
+	if f.noConfig {
+		off := false
+		return (&config.Config{SystemVariables: &off}).WithIgnored(f.ignore...), nil
+	}
+
+	cfg, err := config.Load(root, f.configPath)
+	if err != nil {
+		return nil, err
+	}
+	return cfg.WithIgnored(f.ignore...), nil
+}
+
+// scanOptions merges the config's excludes with the flag's.
+func (f *scanFlags) scanOptions(cfg *config.Config) scanner.Options {
+	return scanner.Options{
+		Exclude:      append(append([]string(nil), cfg.Exclude...), f.exclude...),
+		IncludeTests: f.includeTests,
+	}
 }
 
 // run scans and analyzes. Parse failures are reported but do not stop the run, so one malformed file cannot hide the rest of a project.
 func (f *scanFlags) run(cmd *cobra.Command, path string) (*scanner.Result, *analyzer.Report, error) {
-	res, err := scanner.Scan(path, scanner.Options{
-		Exclude:      f.exclude,
-		IncludeTests: f.includeTests,
-	})
+	cfg, err := f.config(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	res, err := scanner.Scan(path, f.scanOptions(cfg))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -86,7 +120,7 @@ func (f *scanFlags) run(cmd *cobra.Command, path string) (*scanner.Result, *anal
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %v\n", e)
 	}
 
-	return res, analyzer.Analyze(res), nil
+	return res, analyzer.Analyze(res).Without(cfg.IgnoresVariable), nil
 }
 
 func defaultPath(args []string) string {

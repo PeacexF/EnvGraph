@@ -1,0 +1,8 @@
+# EnvGraph's own configuration.
+#
+# The example projects carry deliberately broken configuration — a missing
+# variable, an unused one — so that `envgraph check examples/<name>` has
+# something to find. Scanning them from the repository root would report those
+# fixtures as this project's own problems.
+exclude:
+  - examples

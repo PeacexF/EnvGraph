@@ -474,3 +474,114 @@ func TestServeHelpDocumentsItsDefaults(t *testing.T) {
 	}
 	assertContains(t, res.stdout, "--port", "--host", "--show-values", "localhost")
 }
+
+func TestIgnoreFlag(t *testing.T) {
+	root := project(t, map[string]string{".env": "KEPT=1\nDROPPED=2\n"})
+
+	res := run("scan", root, "--ignore", "DROPPED")
+	assertContains(t, res.stdout, "KEPT")
+
+	if strings.Contains(res.stdout, "DROPPED") {
+		t.Errorf("--ignore did not drop the variable:\n%s", res.stdout)
+	}
+}
+
+func TestIgnoreFlagAcceptsGlobs(t *testing.T) {
+	root := project(t, map[string]string{".env": "VITE_A=1\nVITE_B=2\nKEPT=3\n"})
+
+	res := run("scan", root, "--ignore", "VITE_*")
+	if strings.Contains(res.stdout, "VITE_") {
+		t.Errorf("the glob did not drop the variables:\n%s", res.stdout)
+	}
+	assertContains(t, res.stdout, "KEPT")
+}
+
+func TestSystemVariablesAreIgnoredByDefault(t *testing.T) {
+	root := project(t, map[string]string{"Dockerfile": "ENV PATH=/opt/bin\nENV REAL=1\n"})
+
+	res := run("scan", root)
+	if strings.Contains(res.stdout, "PATH") {
+		t.Errorf("PATH should not be reported by default:\n%s", res.stdout)
+	}
+	assertContains(t, res.stdout, "REAL")
+}
+
+func TestNoConfigBringsSystemVariablesBack(t *testing.T) {
+	root := project(t, map[string]string{"Dockerfile": "ENV PATH=/opt/bin\n"})
+
+	assertContains(t, run("scan", root, "--no-config").stdout, "PATH")
+}
+
+func TestConfigFileIsPickedUpFromTheRoot(t *testing.T) {
+	root := project(t, map[string]string{
+		".envgraph.yml": "exclude:\n  - fixtures\nignore:\n  - OLD_KEY\n",
+		".env":          "KEPT=1\nOLD_KEY=2\n",
+		"fixtures/.env": "FROM_FIXTURE=3\n",
+	})
+
+	res := run("scan", root)
+	assertContains(t, res.stdout, "KEPT")
+
+	for _, gone := range []string{"OLD_KEY", "FROM_FIXTURE"} {
+		if strings.Contains(res.stdout, gone) {
+			t.Errorf("%s survived the config:\n%s", gone, res.stdout)
+		}
+	}
+}
+
+func TestNoConfigSkipsTheFile(t *testing.T) {
+	root := project(t, map[string]string{
+		".envgraph.yml": "ignore:\n  - OLD_KEY\n",
+		".env":          "OLD_KEY=1\n",
+	})
+
+	assertContains(t, run("scan", root, "--no-config").stdout, "OLD_KEY")
+}
+
+func TestExplicitConfigPath(t *testing.T) {
+	root := project(t, map[string]string{".env": "OLD_KEY=1\nKEPT=2\n"})
+	other := project(t, map[string]string{"rules.yml": "ignore:\n  - OLD_KEY\n"})
+
+	res := run("scan", root, "--config", filepath.Join(other, "rules.yml"))
+	assertContains(t, res.stdout, "KEPT")
+
+	if strings.Contains(res.stdout, "OLD_KEY") {
+		t.Errorf("the named config was not applied:\n%s", res.stdout)
+	}
+}
+
+func TestBadConfigIsReported(t *testing.T) {
+	root := project(t, map[string]string{".envgraph.yml": "ignore: [unclosed\n"})
+
+	res := run("scan", root)
+	if res.code != 1 {
+		t.Errorf("exit code = %d, want 1", res.code)
+	}
+	assertContains(t, res.stderr, "error:")
+}
+
+func TestIgnoredVariablesLeaveTheGraph(t *testing.T) {
+	root := project(t, map[string]string{".env": "KEPT=1\nDROPPED=2\n"})
+
+	res := run("export", root, "-o", "-", "--ignore", "DROPPED")
+	if res.code != 0 {
+		t.Fatalf("exit code = %d, want 0: %s", res.code, res)
+	}
+	if strings.Contains(res.stdout, "DROPPED") {
+		t.Errorf("an ignored variable is still in the graph:\n%s", res.stdout)
+	}
+	assertContains(t, res.stdout, "KEPT")
+}
+
+func TestIgnoredVariablesCannotFailCheck(t *testing.T) {
+	root := project(t, map[string]string{
+		"main.go": "package main\nimport \"os\"\nfunc main() { _ = os.Getenv(\"ABSENT\") }\n",
+	})
+
+	if res := run("check", root); res.code != 1 {
+		t.Fatalf("exit code = %d, want 1 before ignoring", res.code)
+	}
+	if res := run("check", root, "--ignore", "ABSENT"); res.code != 0 {
+		t.Errorf("exit code = %d, want 0 once ignored", res.code)
+	}
+}

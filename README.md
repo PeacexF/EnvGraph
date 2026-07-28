@@ -225,9 +225,41 @@ Useful flags:
 | Flag              | Effect                                            |
 | ----------------- | ------------------------------------------------- |
 | `--exclude <dir>` | skip additional directories                       |
+| `--ignore <name>` | drop variables, glob wildcards allowed            |
 | `--include-tests` | count usage in test files                         |
 | `--show-values`   | include assigned values (these are often secrets) |
+| `--config <file>` | use a specific `.envgraph.yml`                    |
+| `--no-config`     | ignore the config file and the system defaults    |
 | `-o <file>`       | write to a file instead of stdout                 |
+
+---
+
+# Configuration
+
+Drop an `.envgraph.yml` in the project root to stop reporting things you do
+not care about. Every command reads it, and an ignored variable disappears
+from the report and the graph alike.
+
+```yaml
+# Directory names to skip, the same as --exclude.
+exclude:
+  - examples
+  - testdata
+
+# Variables to drop. Wildcards allowed.
+ignore:
+  - OLD_API_KEY
+  - "VITE_*"
+
+# Variables set by the shell, the OS, or the CI runner — PATH, HOME, CI,
+# NO_COLOR and friends — are ignored by default. Set this to false to see them.
+systemVariables: true
+```
+
+Without this, a real project reports noise: a Dockerfile that extends `PATH`
+looks like it defines an unused variable, and committed fixtures look like
+broken configuration. EnvGraph ships [its own](.envgraph.yml) for exactly that
+reason.
 
 Try it against the bundled examples:
 
@@ -254,6 +286,7 @@ envgraph serve examples/node-app
 </div>
 
 ---
+
 # How variables are resolved
 
 A variable is **missing** when nothing supplies a value for it. What counts

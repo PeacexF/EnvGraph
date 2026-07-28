@@ -19,6 +19,9 @@ type Options struct {
 	// Scan is passed through to the scanner on every request.
 	Scan scanner.Options
 
+	// Ignored drops variables from the report, matching the CLI's ignore rules.
+	Ignored func(name string) bool
+
 	// ShowValues serves the value assigned to each variable. Off by default: .env files hold credentials, and this is an HTTP endpoint.
 	ShowValues bool
 
@@ -56,7 +59,7 @@ func (s *server) handleGraph(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	report := analyzer.Analyze(res)
+	report := analyzer.Analyze(res).Without(s.opts.Ignored)
 	writeJSON(w, analyzer.NewDocument(res, report, s.opts.ShowValues))
 }
 

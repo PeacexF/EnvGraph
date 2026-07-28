@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/PeacexF/EnvGraph/internal/scanner"
 	"github.com/PeacexF/EnvGraph/internal/server"
 )
 
@@ -33,6 +32,11 @@ func newServeCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := defaultPath(args)
 
+			cfg, err := flags.config(root)
+			if err != nil {
+				return err
+			}
+
 			// Scan once up front so a bad path fails immediately rather than
 			// on the first request.
 			if _, _, err := flags.run(cmd, root); err != nil {
@@ -40,11 +44,9 @@ func newServeCmd() *cobra.Command {
 			}
 
 			handler := server.New(server.Options{
-				Root: root,
-				Scan: scanner.Options{
-					Exclude:      flags.exclude,
-					IncludeTests: flags.includeTests,
-				},
+				Root:       root,
+				Scan:       flags.scanOptions(cfg),
+				Ignored:    cfg.IgnoresVariable,
 				ShowValues: showValues,
 			})
 

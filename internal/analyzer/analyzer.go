@@ -336,3 +336,18 @@ func less(a, b parser.Location) bool {
 	}
 	return a.Line < b.Line
 }
+
+// Without drops the variables an ignore rule matches
+func (r *Report) Without(ignored func(name string) bool) *Report {
+	if ignored == nil {
+		return r
+	}
+
+	out := &Report{Variables: make([]Variable, 0, len(r.Variables))}
+	for _, v := range r.Variables {
+		if !ignored(v.Name) {
+			out.Variables = append(out.Variables, v)
+		}
+	}
+	return out
+}

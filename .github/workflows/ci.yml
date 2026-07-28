@@ -135,6 +135,11 @@ jobs:
             fi
           done
 
+      # EnvGraph ships an .envgraph.yml so it runs clean on itself; if a
+      # change introduces real configuration debt, this catches it.
+      - name: Check its own configuration
+        run: ./envgraph check . --strict
+
       - name: Export a graph
         run: ./envgraph export examples/simple-go -o - | head -20
 
