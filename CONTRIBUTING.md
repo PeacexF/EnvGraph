@@ -14,12 +14,18 @@ All contributions are welcome: bug fixes, new features, documentation improvemen
 
 If you're planning a large feature, consider opening an issue first so we can discuss it.
 
+## Understanding the codebase
+
+[docs/architecture.md](docs/architecture.md) covers the four stages, the data
+model every parser speaks, and a step-by-step recipe for adding support for a
+new configuration format. Start there before a first change.
+
 ## Running the checks
 
 CI runs the same things you can run locally:
 
 ```bash
-gofmt -l ./cmd ./internal ./tests   # must print nothing
+gofmt -l ./cmd ./internal ./tests ./web   # must print nothing
 go vet ./...
 go test -race ./...
 ```

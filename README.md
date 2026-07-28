@@ -411,11 +411,21 @@ EnvGraph provides that missing layer of visibility.
 
 ---
 
+# Documentation
+
+| Document | For |
+| --- | --- |
+| [Guide](docs/guide.md) | Commands, configuration, and how EnvGraph decides what is missing |
+| [Architecture](docs/architecture.md) | How it works inside, and how to add a new configuration source |
+
+---
+
 # Contributing
 
 Contributions are welcome.
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes, and
+[docs/architecture.md](docs/architecture.md) for how the pieces fit together.
 
 ---
 
